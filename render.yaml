@@ -4,7 +4,7 @@ services:
     env: python
     buildCommand: |
       python -m pip install --upgrade pip
-      pip install -r requirements.txt
+      pip install --no-cache-dir -r requirements.txt
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: OPENAI_API_KEY
@@ -12,7 +12,7 @@ services:
       - key: FIGMA_ACCESS_TOKEN
         sync: false
       - key: PYTHON_VERSION
-        value: 3.9.0
+        value: 3.9.18
     healthCheckPath: /
     autoDeploy: true
     plan: free 
