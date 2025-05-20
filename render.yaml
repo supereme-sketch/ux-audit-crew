@@ -12,7 +12,7 @@ services:
       - key: FIGMA_ACCESS_TOKEN
         sync: false
       - key: PYTHON_VERSION
-        value: 3.9.18
+        value: 3.10.0
     healthCheckPath: /
     autoDeploy: true
     plan: free 
