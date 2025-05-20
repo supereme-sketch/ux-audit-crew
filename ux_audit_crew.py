@@ -5,8 +5,10 @@ load_dotenv()
 
 from typing import List, Dict
 from enum import Enum
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, Process
 from tools.figma_tools import FigmaAnalyzer
+from config import settings
+import json
 
 class SeverityLevel(Enum):
     CRITICAL = "Critical"
@@ -20,287 +22,160 @@ class EffortLevel(Enum):
     MAJOR_REFACTOR = "Major Refactor"
 
 def run_ux_audit(figma_url: str) -> str:
-    """Run the UX audit on the provided Figma URL and return the results."""
-    print(f"Analyzing Figma prototype at: {figma_url}")
-
-    class HeuristicReviewAgent(Agent):
-        """Agent responsible for evaluating the design against Nielsen's 10 usability heuristics."""
-        
-        def __init__(self):
-            super().__init__(
-                role="UX Heuristic Reviewer",
-                goal="Identify usability issues based on Nielsen's 10 heuristics",
-                backstory="""Expert in usability heuristics with years of experience in UX evaluation.
-                Specializes in identifying issues related to system status visibility, user control,
-                error prevention, and other core UX principles. Known for providing actionable,
-                specific recommendations with severity and effort estimates.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class AccessibilityAgent(Agent):
-        """Agent focused on WCAG 2.1 compliance and accessibility issues."""
-        
-        def __init__(self):
-            super().__init__(
-                role="Accessibility Specialist",
-                goal="Identify WCAG 2.1 compliance issues and accessibility barriers",
-                backstory="""Certified accessibility expert with deep knowledge of WCAG guidelines.
-                Specializes in color contrast, text sizing, alternative text, keyboard navigation,
-                and screen reader compatibility. Passionate about making digital products
-                accessible to all users.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class ResponsiveReadinessAgent(Agent):
-        """Agent that evaluates responsive design and mobile usability."""
-        
-        def __init__(self):
-            super().__init__(
-                role="Responsive Design Expert",
-                goal="Evaluate mobile responsiveness and touch target adequacy",
-                backstory="""Mobile-first design specialist with expertise in responsive layouts.
-                Focuses on breakpoint consistency, touch target sizes, and mobile interaction patterns.
-                Experienced in identifying issues that affect mobile user experience.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class UXCopyAgent(Agent):
-        """Agent that reviews microcopy and content for clarity and consistency."""
-        
-        def __init__(self):
-            super().__init__(
-                role="UX Copy Specialist",
-                goal="Identify unclear or inconsistent microcopy and content issues",
-                backstory="""Content strategist with expertise in UX writing and microcopy.
-                Specializes in clear, concise, and user-friendly language. Focuses on
-                button labels, error messages, instructions, and overall content tone.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class VisualHierarchyAgent(Agent):
-        """Agent that evaluates visual hierarchy and information architecture."""
-        
-        def __init__(self):
-            super().__init__(
-                role="Visual Hierarchy Expert",
-                goal="Analyze visual hierarchy and information architecture",
-                backstory="""Visual design expert specializing in information architecture
-                and visual hierarchy. Focuses on how users scan and process information,
-                ensuring important elements stand out and content flows naturally.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class InteractionPatternAgent(Agent):
-        """Agent that evaluates interaction patterns and user flows."""
-        
-        def __init__(self):
-            super().__init__(
-                role="Interaction Pattern Specialist",
-                goal="Analyze interaction patterns and user flows",
-                backstory="""Interaction design expert with deep knowledge of common
-                patterns and best practices. Specializes in evaluating user flows,
-                navigation patterns, and interaction consistency across the interface.""",
-                verbose=True,
-                allow_delegation=True,
-                tools=[FigmaAnalyzer]
-            )
-
-    class SummaryAgent(Agent):
-        """Agent that aggregates findings and creates a prioritized report."""
-        
-        def __init__(self):
-            super().__init__(
-                role="UX Audit Report Writer",
-                goal="Compile and prioritize findings into a comprehensive audit report",
-                backstory="""UX researcher with experience in synthesizing complex findings
-                into actionable reports. Expert at identifying patterns across different
-                aspects of the interface and prioritizing issues based on impact and
-                implementation effort. Specializes in creating clear, actionable reports
-                with ROI calculations and implementation timelines.""",
-                verbose=True,
-                allow_delegation=True
-            )
-
-    # Initialize agents
-    heuristic_agent = HeuristicReviewAgent()
-    accessibility_agent = AccessibilityAgent()
-    responsive_agent = ResponsiveReadinessAgent()
-    copy_agent = UXCopyAgent()
-    visual_hierarchy_agent = VisualHierarchyAgent()
-    interaction_agent = InteractionPatternAgent()
-    summary_agent = SummaryAgent()
-
-    # Create tasks for each agent with enhanced evaluation criteria
+    """Run a UX audit on a Figma design."""
+    
+    # Initialize the Figma analyzer
+    figma_analyzer = FigmaAnalyzer(figma_url)
+    
+    # Create specialized agents
+    heuristic_expert = Agent(
+        role='UX Heuristic Expert',
+        goal='Evaluate the design against Nielsen\'s 10 usability heuristics',
+        backstory='Expert in usability heuristics with years of experience in UX evaluation',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    accessibility_expert = Agent(
+        role='Accessibility Expert',
+        goal='Review the design for accessibility compliance and best practices',
+        backstory='Specialist in web accessibility standards and inclusive design',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    responsive_expert = Agent(
+        role='Responsive Design Expert',
+        goal='Analyze the design\'s responsiveness and adaptability',
+        backstory='Expert in responsive design patterns and mobile-first approaches',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    copy_expert = Agent(
+        role='UX Copy Expert',
+        goal='Review and improve the UX copy and microcopy',
+        backstory='Specialist in UX writing and content strategy',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    visual_expert = Agent(
+        role='Visual Hierarchy Expert',
+        goal='Analyze the visual hierarchy and information architecture',
+        backstory='Expert in visual design principles and information architecture',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    interaction_expert = Agent(
+        role='Interaction Design Expert',
+        goal='Evaluate interaction patterns and user flows',
+        backstory='Specialist in interaction design and user flow optimization',
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    # Create tasks for each agent
     heuristic_task = Task(
-        description=f"""Analyze the Figma prototype at {figma_url} against Nielsen's 10 heuristics.
-        For each finding:
-        1. Identify specific examples where the design succeeds or fails
-        2. Explain why each finding matters
-        3. Suggest specific improvements
-        4. Assign severity level (Critical/High/Medium/Low)
-        5. Estimate implementation effort (Quick Fix/Medium Effort/Major Refactor)
-        6. Provide confidence score (1-10)
-        7. Include potential impact metrics
-        Generate at least 3 specific findings with examples.""",
-        agent=heuristic_agent
+        description=f"Analyze the Figma design at {figma_url} using Nielsen's 10 usability heuristics. Provide specific examples and recommendations.",
+        agent=heuristic_expert
     )
-
+    
     accessibility_task = Task(
-        description=f"""Review the Figma prototype at {figma_url} for WCAG 2.1 compliance issues.
-        For each finding:
-        1. Identify specific accessibility barriers
-        2. Explain impact on users
-        3. Suggest specific improvements
-        4. Assign severity level (Critical/High/Medium/Low)
-        5. Estimate implementation effort (Quick Fix/Medium Effort/Major Refactor)
-        6. Provide confidence score (1-10)
-        7. Include potential impact metrics
-        Focus on:
-        - Color contrast ratios
-        - Text sizing and readability
-        - Alternative text for images
-        - Keyboard navigation
-        - Screen reader compatibility
-        Provide at least 3 specific findings with examples.""",
-        agent=accessibility_agent
+        description=f"Review the Figma design at {figma_url} for accessibility compliance. Check for WCAG guidelines and provide specific recommendations.",
+        agent=accessibility_expert
     )
-
+    
     responsive_task = Task(
-        description=f"""Evaluate the Figma prototype at {figma_url} for mobile responsiveness.
-        Check:
-        1. Breakpoint consistency
-        2. Touch target sizes (minimum 44x44px)
-        3. Mobile navigation patterns
-        4. Content scaling
-        5. Mobile interaction patterns
-        List at least 3 specific concerns with examples.""",
-        agent=responsive_agent
+        description=f"Analyze the Figma design at {figma_url} for responsive design considerations. Evaluate breakpoints, layouts, and mobile-first approach.",
+        agent=responsive_expert
     )
-
+    
     copy_task = Task(
-        description=f"""Review all microcopy in the Figma prototype at {figma_url}.
-        Analyze:
-        1. Button labels and CTAs
-        2. Error messages and notifications
-        3. Form labels and instructions
-        4. Navigation labels
-        5. Help text and tooltips
-        Provide at least 3 specific examples of unclear or inconsistent language.""",
-        agent=copy_agent
+        description=f"Review the UX copy in the Figma design at {figma_url}. Analyze microcopy, error messages, and overall content strategy.",
+        agent=copy_expert
     )
-
-    visual_hierarchy_task = Task(
-        description=f"""Analyze the visual hierarchy in the Figma prototype at {figma_url}.
-        Evaluate:
-        1. Information architecture
-        2. Visual scanning patterns
-        3. Content prioritization
-        4. Visual weight and emphasis
-        5. Content grouping and relationships
-        Provide at least 3 specific findings with examples.""",
-        agent=visual_hierarchy_agent
+    
+    visual_task = Task(
+        description=f"Analyze the visual hierarchy in the Figma design at {figma_url}. Evaluate information architecture, visual flow, and design patterns.",
+        agent=visual_expert
     )
-
+    
     interaction_task = Task(
-        description=f"""Evaluate interaction patterns in the Figma prototype at {figma_url}.
-        Analyze:
-        1. User flows and navigation
-        2. Interaction consistency
-        3. Feedback mechanisms
-        4. State changes
-        5. Error handling
-        Provide at least 3 specific findings with examples.""",
-        agent=interaction_agent
+        description=f"Evaluate the interaction patterns in the Figma design at {figma_url}. Analyze user flows, navigation, and interaction feedback.",
+        agent=interaction_expert
     )
-
-    summary_task = Task(
-        description="""Compile all findings into a prioritized Markdown report with:
-
-        1. H1 title: 'UX Audit Report'
-        
-        2. Executive Summary
-           - Overview of key findings
-           - Critical issues summary
-           - Quick wins opportunities
-        
-        3. Impact Analysis
-           - User impact matrix (Severity vs. Effort)
-           - ROI calculation for key improvements
-           - Implementation timeline estimates
-        
-        4. Quick Wins Section
-           - Low effort, high impact improvements
-           - Implementation suggestions
-           - Expected benefits
-        
-        5. Detailed Findings
-           For each category (Heuristic Review, Accessibility, etc.):
-           - Summary of findings
-           - Severity levels
-           - Effort estimates
-           - Confidence scores
-           - Impact metrics
-           - Specific recommendations
-        
-        6. Implementation Roadmap
-           - Phase 1: Quick Wins (1-2 weeks)
-           - Phase 2: Medium Effort (2-4 weeks)
-           - Phase 3: Major Refactors (1-3 months)
-        
-        7. ROI Calculator
-           - Cost estimates
-           - Expected benefits
-           - Payback period
-        
-        8. Before/After Recommendations
-           - Key improvements with mockups
-           - Expected outcomes
-           - Success metrics
-        
-        9. Follow-up Plan
-           - Review schedule
-           - Success metrics
-           - Stakeholder feedback process
-        
-        Ensure findings are actionable and well-organized with clear prioritization.""",
-        agent=summary_agent
-    )
-
-    # Create and run the crew
+    
+    # Create the crew
     crew = Crew(
         agents=[
-            heuristic_agent,
-            accessibility_agent,
-            responsive_agent,
-            copy_agent,
-            visual_hierarchy_agent,
-            interaction_agent,
-            summary_agent
+            heuristic_expert,
+            accessibility_expert,
+            responsive_expert,
+            copy_expert,
+            visual_expert,
+            interaction_expert
         ],
         tasks=[
             heuristic_task,
             accessibility_task,
             responsive_task,
             copy_task,
-            visual_hierarchy_task,
-            interaction_task,
-            summary_task
+            visual_task,
+            interaction_task
         ],
-        verbose=True
+        verbose=2,
+        process=Process.sequential,
+        llm_model=settings.OPENAI_MODEL
     )
+    
+    # Run the crew
+    result = crew.kickoff()
+    
+    # Parse the result to extract individual reports
+    reports = {
+        'heuristic': extract_agent_report(result, 'UX Heuristic Expert'),
+        'accessibility': extract_agent_report(result, 'Accessibility Expert'),
+        'responsive': extract_agent_report(result, 'Responsive Design Expert'),
+        'copy': extract_agent_report(result, 'UX Copy Expert'),
+        'visual': extract_agent_report(result, 'Visual Hierarchy Expert'),
+        'interaction': extract_agent_report(result, 'Interaction Design Expert')
+    }
+    
+    # Create a consolidated summary
+    reports['summary'] = create_summary(reports)
+    
+    # Return the reports as JSON
+    return json.dumps(reports)
 
-    # Execute the crew and return results
-    return crew.kickoff()
+def extract_agent_report(result, agent_name):
+    """Extract a specific agent's report from the crew result."""
+    try:
+        # Split the result by agent names and find the relevant section
+        sections = result.split('\n\n')
+        for section in sections:
+            if agent_name in section:
+                # Remove the agent name and clean up the report
+                report = section.replace(agent_name + ':', '').strip()
+                return report
+        return f"No report found for {agent_name}"
+    except Exception as e:
+        return f"Error extracting report for {agent_name}: {str(e)}"
+
+def create_summary(reports):
+    """Create a consolidated summary of all reports."""
+    summary = "Consolidated UX Audit Summary\n\n"
+    
+    # Add key findings from each report
+    for agent, report in reports.items():
+        if agent != 'summary':
+            summary += f"=== {agent.replace('_', ' ').title()} ===\n"
+            # Extract the first few sentences or key points
+            key_points = report.split('\n')[0:3]
+            summary += '\n'.join(key_points) + '\n\n'
+    
+    return summary
 
 if __name__ == '__main__':
     import sys

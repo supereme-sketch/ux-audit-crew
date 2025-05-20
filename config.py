@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     HOST: str = os.getenv("HOST", "localhost")
     
     # Model Settings
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     
     # Analysis Settings
     MIN_FINDINGS_PER_AGENT: int = 3
@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     ENABLE_ROI_CALCULATIONS: bool = True
     ENABLE_IMPLEMENTATION_TIMELINE: bool = True
     ENABLE_BEFORE_AFTER: bool = True
+    
+    # Slack settings
+    SLACK_BOT_TOKEN: str = os.getenv("SLACK_BOT_TOKEN")
+    SLACK_APP_TOKEN: str = os.getenv("SLACK_APP_TOKEN")
     
     class Config:
         env_file = ".env"

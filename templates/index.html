@@ -3,76 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UX Audit Tool</title>
+    <title>UX Audit Crew</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 1000;
+        }
+        .loading-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-section {
+            display: none;
+            margin-top: 2rem;
+        }
+        .error-message {
+            display: none;
+            color: #dc2626;
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background: #fee2e2;
+        }
+        .agent-report {
+            display: none;
+            margin-top: 1rem;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        .agent-report.active {
+            display: block;
+        }
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-button.active {
+            background: #3b82f6;
+            color: white;
+        }
+        .tab-button:not(.active) {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .tab-button:not(.active):hover {
+            background: #e2e8f0;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-center mb-8">UX Audit Tool</h1>
-        
-        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-            <form id="auditForm" class="space-y-4">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">UX Audit Crew</h1>
+            <p class="text-xl text-gray-600">AI-powered UX analysis for your Figma designs</p>
+        </header>
+
+        <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8">
+            <form id="auditForm" class="space-y-6">
                 <div>
-                    <label for="figma_url" class="block text-sm font-medium text-gray-700">Figma Prototype URL</label>
-                    <input type="url" id="figma_url" name="figma_url" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                           placeholder="https://www.figma.com/proto/...">
+                    <label for="figmaUrl" class="block text-sm font-medium text-gray-700 mb-2">
+                        Figma URL
+                    </label>
+                    <input type="url" 
+                           id="figmaUrl" 
+                           name="figmaUrl" 
+                           required
+                           placeholder="https://www.figma.com/file/..."
+                           class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
-                <button type="submit"
-                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    Run UX Audit
-                </button>
+
+                <div class="flex items-center space-x-4">
+                    <button type="submit" 
+                            class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                        Run UX Audit
+                    </button>
+                </div>
             </form>
 
-            <div id="loading" class="hidden mt-4 text-center">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="mt-2 text-gray-600">Running UX audit...</p>
+            <div id="loading" class="loading">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <p class="text-lg text-gray-700">Analyzing your design...</p>
+                    <p class="text-sm text-gray-500 mt-2">This may take a few minutes</p>
+                </div>
             </div>
 
-            <div id="result" class="hidden mt-6">
-                <h2 class="text-xl font-semibold mb-4">Audit Results</h2>
-                <div id="resultContent" class="prose max-w-none"></div>
+            <div id="error" class="error-message"></div>
+
+            <div id="result" class="result-section">
+                <div class="flex space-x-2 mb-4 overflow-x-auto pb-2">
+                    <button class="tab-button active" data-tab="summary">Summary</button>
+                    <button class="tab-button" data-tab="heuristic">Heuristic Expert</button>
+                    <button class="tab-button" data-tab="accessibility">Accessibility Expert</button>
+                    <button class="tab-button" data-tab="responsive">Responsive Expert</button>
+                    <button class="tab-button" data-tab="copy">UX Copy Expert</button>
+                    <button class="tab-button" data-tab="visual">Visual Expert</button>
+                    <button class="tab-button" data-tab="interaction">Interaction Expert</button>
+                </div>
+
+                <div id="summary" class="agent-report active">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Consolidated Analysis</h2>
+                    <div id="summaryContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="heuristic" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Heuristic Evaluation</h2>
+                    <div id="heuristicContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="accessibility" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Accessibility Review</h2>
+                    <div id="accessibilityContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="responsive" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Responsive Design Analysis</h2>
+                    <div id="responsiveContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="copy" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">UX Copy Analysis</h2>
+                    <div id="copyContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="visual" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Visual Hierarchy Review</h2>
+                    <div id="visualContent" class="prose max-w-none"></div>
+                </div>
+
+                <div id="interaction" class="agent-report">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interaction Pattern Analysis</h2>
+                    <div id="interactionContent" class="prose max-w-none"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3">Features</h3>
+                <ul class="space-y-2 text-gray-600">
+                    <li class="flex items-center">
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Individual Expert Reports
+                    </li>
+                    <li class="flex items-center">
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Consolidated Summary
+                    </li>
+                    <li class="flex items-center">
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Detailed Analysis
+                    </li>
+                </ul>
             </div>
 
-            <div id="error" class="hidden mt-4 p-4 bg-red-50 text-red-700 rounded-md"></div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3">How It Works</h3>
+                <ol class="space-y-2 text-gray-600">
+                    <li class="flex items-start">
+                        <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-2">1</span>
+                        Copy your Figma URL
+                    </li>
+                    <li class="flex items-start">
+                        <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-2">2</span>
+                        Paste it in the input field
+                    </li>
+                    <li class="flex items-start">
+                        <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-2">3</span>
+                        Click "Run UX Audit"
+                    </li>
+                </ol>
+            </div>
         </div>
     </div>
 
     <script>
+        // Tab switching functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and reports
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.agent-report').forEach(r => r.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding report
+                button.classList.add('active');
+                const tabId = button.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
         document.getElementById('auditForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const form = e.target;
+            const figmaUrl = form.figmaUrl.value;
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
-            const resultContent = document.getElementById('resultContent');
             const error = document.getElementById('error');
             
             // Reset UI
-            loading.classList.remove('hidden');
-            result.classList.add('hidden');
-            error.classList.add('hidden');
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            error.style.display = 'none';
             
             try {
                 const response = await fetch('/analyze', {
                     method: 'POST',
-                    body: new FormData(form)
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ figmaUrl }),
                 });
                 
                 const data = await response.json();
                 
                 if (response.ok) {
-                    resultContent.innerHTML = data.result.replace(/\n/g, '<br>');
-                    result.classList.remove('hidden');
+                    // Update each agent's report
+                    Object.entries(data.reports).forEach(([agent, content]) => {
+                        const element = document.getElementById(`${agent}Content`);
+                        if (element) {
+                            element.innerHTML = content.replace(/\n/g, '<br>');
+                        }
+                    });
+                    
+                    // Show the results
+                    result.style.display = 'block';
                 } else {
-                    error.textContent = data.error || 'An error occurred';
-                    error.classList.remove('hidden');
+                    error.textContent = data.error || 'An error occurred during analysis';
+                    error.style.display = 'block';
                 }
             } catch (err) {
-                error.textContent = 'An error occurred while running the audit';
-                error.classList.remove('hidden');
+                error.textContent = 'Failed to connect to the server';
+                error.style.display = 'block';
             } finally {
-                loading.classList.add('hidden');
+                loading.style.display = 'none';
             }
         });
     </script>
